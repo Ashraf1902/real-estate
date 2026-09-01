@@ -25,11 +25,28 @@ const json = (res, code, data) => {
 };
 
 async function readBody(req) {
-  try {
-    return await req.json();
-  } catch {
-    return {};
-  }
+  return new Promise((resolve) => {
+    let body = '';
+    let got = false;
+    try {
+      req.on('data', (c) => (body += c));
+      req.on('end', () => {
+        got = true;
+        try {
+          resolve(JSON.parse(body || '{}'));
+        } catch {
+          resolve({});
+        }
+      });
+    } catch {
+      // req may be a fetch Request-like object in some runtimes
+      if (!got && typeof req.json === 'function') {
+        req.json().then(resolve).catch(() => resolve({}));
+      } else {
+        resolve({});
+      }
+    }
+  });
 }
 
 export default async function handler(req, res) {
