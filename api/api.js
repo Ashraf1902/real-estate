@@ -25,27 +25,33 @@ const json = (res, code, data) => {
 };
 
 async function readBody(req) {
+  // Many Vercel Node runtimes populate req.body already.
+  if (req.body) {
+    if (typeof req.body === 'string') { try { return JSON.parse(req.body); } catch { return {}; } }
+    if (typeof req.body === 'object') return req.body;
+  }
+  // Fetch-like request object.
+  if (typeof req.text === 'function') {
+    try { return JSON.parse(await req.text() || '{}'); } catch { return {}; }
+  }
+  // Node IncomingMessage stream.
   return new Promise((resolve) => {
-    let body = '';
-    let got = false;
+    let data = '';
+    let done = false;
+    const finish = (raw) => {
+      if (done) return;
+      done = true;
+      try { resolve(JSON.parse(raw || '{}')); } catch { resolve({}); }
+    };
     try {
-      req.on('data', (c) => (body += c));
-      req.on('end', () => {
-        got = true;
-        try {
-          resolve(JSON.parse(body || '{}'));
-        } catch {
-          resolve({});
-        }
-      });
+      req.on('data', (c) => (data += c));
+      req.on('end', () => finish(data));
+      req.on('error', () => finish(''));
     } catch {
-      // req may be a fetch Request-like object in some runtimes
-      if (!got && typeof req.json === 'function') {
-        req.json().then(resolve).catch(() => resolve({}));
-      } else {
-        resolve({});
-      }
+      finish('');
     }
+    // Safety: never hang a request. Vercel stream may be consumed already.
+    setTimeout(() => finish(data), 2000);
   });
 }
 
