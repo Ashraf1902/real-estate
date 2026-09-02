@@ -221,6 +221,7 @@ export interface AppSettings {
   rtl: boolean;
   forceSecure: boolean;
   emailNotify: boolean;
+  contactEmail: string;
   gates: PaymentGate[];
   pixels: PixelsSettings;
   coupons: CouponItem[];
@@ -240,6 +241,7 @@ export const defaultSettings: AppSettings = {
   rtl: true,
   forceSecure: true,
   emailNotify: true,
+  contactEmail: '',
   gates: [
     { name: 'فودافون كاش', on: true },
     { name: 'الدفع بالبطاقة (Visa/Master)', on: true },

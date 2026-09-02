@@ -13,6 +13,7 @@ export default function Settings() {
   const [st, setSt] = useState<AppSettings>(defaultSettings);
   const [adminName, setAdminName] = useState(adminNameCtx || 'محمود الشريف');
   const [maintenanceMsg, setMaintenanceMsg] = useState(defaultSettings.maintenanceMessage);
+  const [contactEmail, setContactEmail] = useState('');
   const [saving, setSaving] = useState(false);
   const [customPixel, setCustomPixel] = useState('');
   const [newGate, setNewGate] = useState('');
@@ -22,6 +23,7 @@ export default function Settings() {
       setSt(s);
       setAdminName(s.adminName || adminNameCtx || 'محمود الشريف');
       setMaintenanceMsg(s.maintenanceMessage);
+      setContactEmail(s.contactEmail || '');
     }).catch(() => {});
   }, []);
 
@@ -34,7 +36,7 @@ export default function Settings() {
 
   const saveAll = async () => {
     setSaving(true);
-    const s = await updateSettings({ ...st, adminName, maintenanceMessage: maintenanceMsg });
+    const s = await updateSettings({ ...st, contactEmail, adminName, maintenanceMessage: maintenanceMsg });
     setSaving(false);
     if (s) {
       setSt({ ...defaultSettings, ...s });
@@ -50,6 +52,17 @@ export default function Settings() {
     setSt((s) => ({ ...s, gates: [...s.gates, { name, on: true }] }));
     setNewGate('');
     toast(`أُضيفت بوابة «${name}» — اضغط «حفظ كل الإعدادات» لتطبيقها`);
+  };
+
+  const saveContactEmail = async () => {
+    const email = contactEmail.trim();
+    if (!email) { toast('اكتب بريد المراسلات أولًا'); return; }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { toast('هذا البريد غير صحيح — تحقق من كتابته'); return; }
+    setSaving(true);
+    const s = await updateSettings({ contactEmail: email });
+    setSaving(false);
+    if (s) { setContactEmail(email); toast(`تم تعيين بريد المراسلات إلى ${email}`); }
+    else toast('تعذر الحفظ — تأكد من تشغيل الخادم');
   };
 
   const addCustomPixel = () => {
@@ -133,8 +146,18 @@ export default function Settings() {
             <div className="tg"><button className="btn-ghost" style={{ padding: '.4rem .7rem', fontSize: '.8rem' }} onClick={() => toast('إعدادات الدومين تُدار من لوحة استضافة المجال — يمكنك نسخ رابط الفانل ومشاركته')}><Globe size={14} /> إدارة</button></div>
           </div>
           <div className="setting-row">
-            <div><b>بريد المراسلات</b><span>الذي تصله رسائل الطلبات والتأكيد</span></div>
-            <div className="tg"><button className="btn-ghost" style={{ padding: '.4rem .7rem', fontSize: '.8rem' }} onClick={() => toast('بريد المراسلات الحالي هو بريد تسجيل حسابك — تواصل مع الدعم لتغييره')}><Mail size={14} /> إدارة</button></div>
+            <div><b>بريد المراسلات</b><span>الذي تصله رسائل الطلبات والتأكيد — اكتب أي إيميل تريده</span></div>
+          </div>
+          <div className="set-field" style={{ display: 'flex', gap: '.5rem', alignItems: 'center', marginBottom: '.75rem' }}>
+            <Mail size={16} style={{ color: 'var(--ink-soft)', flexShrink: 0 }} />
+            <input
+              dir="ltr"
+              value={contactEmail}
+              onChange={(e) => setContactEmail(e.target.value)}
+              placeholder="you@company.com"
+              style={{ flex: 1, padding: '.55rem .7rem', border: '1.5px solid var(--line)', borderRadius: 10, fontSize: '.88rem' }}
+            />
+            <button className="btn-solid" onClick={saveContactEmail} style={{ whiteSpace: 'nowrap' }}><Save size={15} /> حفظ</button>
           </div>
           <div className="setting-row">
             <div><b>ضمان استرداد 30 يوم</b><span>معروض في كل صفحات الفانل</span></div>
