@@ -1,9 +1,11 @@
 // Vercel Serverless API — single catch-all handler for every /api/* route.
-// Persistence is via Upstash Redis REST (see store.mjs). Local dev still uses
-// server/index.mjs; this file is only for the production (Vercel) deployment.
+// Persistence via GitHub (see store.mjs). Auth: POST /api/auth verifies the
+// admin password; admin CRUD mutations require the x-admin-pass header.
 
 import { seedProperties, seedServices } from '../server/seed.mjs';
-import { loadDb, saveDb } from './store.mjs';
+import { loadDb, saveDb, saveUpload } from './store.mjs';
+import sharp from 'sharp';
+import Busboy from 'busboy';
 
 const seed = {
   seq: { booking: 0, lead: 0 },
@@ -14,164 +16,187 @@ const seed = {
   settings: { adminName: 'محمود الشريف', brand: 'Real Estate' },
 };
 
+const ADMIN_PASS = process.env.ADMIN_PASS || '';
+
+function ok(res, code, data) {
+  res.status(code).setHeader('Content-Type', 'application/json');
+  res.end(JSON.stringify(data));
+}
+
 function nowStr() {
   const d = new Date();
   const p = (n) => String(n).padStart(2, '0');
   return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`;
 }
 
-const json = (res, code, data) => {
-  res.status(code).json(data);
-};
-
-async function readBody(req) {
-  // Many Vercel Node runtimes populate req.body already.
-  if (req.body) {
-    if (typeof req.body === 'string') { try { return JSON.parse(req.body); } catch { return {}; } }
-    if (typeof req.body === 'object') return req.body;
-  }
-  // Fetch-like request object.
-  if (typeof req.text === 'function') {
-    try { return JSON.parse(await req.text() || '{}'); } catch { return {}; }
-  }
-  // Node IncomingMessage stream.
+function readRaw(req) {
   return new Promise((resolve) => {
     let data = '';
     let done = false;
-    const finish = (raw) => {
-      if (done) return;
-      done = true;
-      try { resolve(JSON.parse(raw || '{}')); } catch { resolve({}); }
-    };
+    const finish = () => { if (!done) { done = true; resolve(data); } };
+    if (req.body && typeof req.body === 'string') { resolve(req.body); return; }
     try {
       req.on('data', (c) => (data += c));
-      req.on('end', () => finish(data));
-      req.on('error', () => finish(''));
-    } catch {
-      finish('');
-    }
-    // Safety: never hang a request. Vercel stream may be consumed already.
-    setTimeout(() => finish(data), 2000);
+      req.on('end', finish);
+      req.on('error', finish);
+    } catch { finish(); }
+    setTimeout(finish, 4000);
   });
 }
+
+async function readBody(req) {
+  if (req.body && typeof req.body === 'object') return req.body;
+  const raw = await readRaw(req);
+  try { return JSON.parse(raw || '{}'); } catch { return {}; }
+}
+
+function isAdmin(req) {
+  if (!ADMIN_PASS) return false;
+  const h = req.headers['x-admin-pass'] || req.headers['X-Admin-Pass'];
+  return !!h && h === ADMIN_PASS;
+}
+
+const adminMutation = (req, res) => {
+  if (!isAdmin(req)) {
+    ok(res, 401, { error: 'unauthorized' });
+    return null;
+  }
+  return true;
+};
 
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET,POST,PUT,DELETE,OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, X-Admin-Pass');
 
-  if (req.method === 'OPTIONS') {
-    res.status(204).end();
-    return;
+  if (req.method === 'OPTIONS') { res.status(204).end(); return; }
+
+  const path = req.url.split('?')[0];
+
+  // AUTH
+  if (path === '/api/auth' && req.method === 'POST') {
+    const b = await readBody(req);
+    if (ADMIN_PASS && b && b.password && b.password === ADMIN_PASS) {
+      return ok(res, 200, { ok: true });
+    }
+    return ok(res, 401, { ok: false });
   }
 
   let db;
   try {
     db = await loadDb(seed);
   } catch (e) {
-    json(res, 500, { error: 'DB unavailable: ' + e.message });
+    ok(res, 500, { error: 'DB unavailable: ' + e.message });
     return;
   }
 
-  const path = req.url.split('?')[0];
-
-  // HEALTH
-  if (path === '/api/health') return json(res, 200, { ok: true });
-
-  // UPLOAD
-  if (path === '/api/upload') {
-    // Note: image -> WebP needs sharp; keep body under Vercel limits.
-    json(res, 501, { error: 'Image upload is not supported on the serverless deployment — use the image URL field or the local server.' });
-    return;
+  // UPLOAD (admin only)
+  if (path === '/api/upload' && req.method === 'POST') {
+    if (!adminMutation(req, res)) return;
+    const buffer = await new Promise((resolve) => {
+      const bb = Busboy({ headers: { 'content-type': req.headers['content-type'] }, limits: { fileSize: 8 * 1024 * 1024 } });
+      let chunks = [];
+      bb.on('file', (_f, file) => {
+        file.on('data', (c) => chunks.push(c));
+        file.on('end', () => {});
+      });
+      bb.on('error', () => resolve(null));
+      bb.on('finish', () => resolve(Buffer.concat(chunks)));
+      try { req.pipe(bb); } catch { resolve(null); }
+    }).catch(() => null);
+    if (!buffer || buffer.length === 0) return ok(res, 400, { error: 'No file received' });
+    try {
+      const webp = await sharp(buffer).resize({ width: 1200, height: 900, fit: 'inside', withoutEnlargement: true }).webp({ quality: 82 }).toBuffer();
+      const name = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}.webp`;
+      await saveUpload(name, webp);
+      return ok(res, 201, { url: `/uploads/${name}` });
+    } catch (e) {
+      return ok(res, 500, { error: 'Conversion failed: ' + e.message });
+    }
   }
 
   // BOOKINGS
-  if (path === '/api/bookings' && req.method === 'GET') return json(res, 200, db.bookings);
+  if (path === '/api/bookings' && req.method === 'GET') return ok(res, 200, db.bookings);
   if (path === '/api/bookings' && req.method === 'POST') {
     const b = await readBody(req);
     db.seq.booking += 1;
     const row = {
-      id: `#BK-${db.seq.booking}`,
-      customer: b.customer || '—',
-      phone: b.phone || '—',
-      property: b.property || '—',
-      service: b.service || 'بدون خدمات',
-      downPayment: Number(b.downPayment) || 0,
-      status: b.status || 'قيد المراجعة',
-      date: nowStr(),
-      servi: Boolean(b.servi),
+      id: `#BK-${db.seq.booking}`, customer: b.customer || '—', phone: b.phone || '—',
+      property: b.property || '—', service: b.service || 'بدون خدمات',
+      downPayment: Number(b.downPayment) || 0, status: b.status || 'قيد المراجعة',
+      date: nowStr(), servi: Boolean(b.servi),
     };
     db.bookings.unshift(row);
     await saveDb(db);
-    return json(res, 201, row);
+    return ok(res, 201, row);
   }
   if (path.startsWith('/api/bookings/') && req.method === 'DELETE') {
+    if (!adminMutation(req, res)) return;
     const id = decodeURIComponent(path.split('/').pop());
     const before = db.bookings.length;
     db.bookings = db.bookings.filter((x) => x.id !== id);
-    if (db.bookings.length === before) return json(res, 404, { error: 'not found' });
+    if (db.bookings.length === before) return ok(res, 404, { error: 'not found' });
     await saveDb(db);
-    return json(res, 200, { ok: true });
+    return ok(res, 200, { ok: true });
   }
 
   // LEADS
-  if (path === '/api/leads' && req.method === 'GET') return json(res, 200, db.leads);
+  if (path === '/api/leads' && req.method === 'GET') return ok(res, 200, db.leads);
   if (path === '/api/leads' && req.method === 'POST') {
     const l = await readBody(req);
     db.seq.lead += 1;
     const row = {
-      id: `#L-${db.seq.lead}`,
-      name: l.name || '—',
-      phone: l.phone || '—',
-      interest: l.interest || '—',
-      stage: l.stage || 'تأكيد الحجز',
-      value: Number(l.value) || 0,
-      date: nowStr(),
-      status: l.status || 'جديد',
+      id: `#L-${db.seq.lead}`, name: l.name || '—', phone: l.phone || '—',
+      interest: l.interest || '—', stage: l.stage || 'تأكيد الحجز',
+      value: Number(l.value) || 0, date: nowStr(), status: l.status || 'جديد',
     };
     db.leads.unshift(row);
     await saveDb(db);
-    return json(res, 201, row);
+    return ok(res, 201, row);
   }
 
   // PROPERTIES
-  if (path === '/api/properties' && req.method === 'GET') return json(res, 200, db.properties);
+  if (path === '/api/properties' && req.method === 'GET') return ok(res, 200, db.properties);
   if (path === '/api/properties' && req.method === 'POST') {
+    if (!adminMutation(req, res)) return;
     const b = await readBody(req);
     const id = b.id || `P-${Date.now().toString().slice(-5)}`;
     const row = { ...b, id };
     db.properties.unshift(row);
     await saveDb(db);
-    return json(res, 201, row);
+    return ok(res, 201, row);
   }
   if (path.startsWith('/api/properties/') && req.method === 'PUT') {
+    if (!adminMutation(req, res)) return;
     const id = decodeURIComponent(path.split('/').pop());
     const idx = db.properties.findIndex((p) => p.id === id);
-    if (idx === -1) return json(res, 404, { error: 'not found' });
+    if (idx === -1) return ok(res, 404, { error: 'not found' });
     const b = await readBody(req);
     db.properties[idx] = { ...db.properties[idx], ...b, id };
     await saveDb(db);
-    return json(res, 200, db.properties[idx]);
+    return ok(res, 200, db.properties[idx]);
   }
   if (path.startsWith('/api/properties/') && req.method === 'DELETE') {
+    if (!adminMutation(req, res)) return;
     const id = decodeURIComponent(path.split('/').pop());
     const before = db.properties.length;
     db.properties = db.properties.filter((p) => p.id !== id);
-    if (db.properties.length === before) return json(res, 404, { error: 'not found' });
+    if (db.properties.length === before) return ok(res, 404, { error: 'not found' });
     await saveDb(db);
-    return json(res, 200, { ok: true });
+    return ok(res, 200, { ok: true });
   }
 
   // SERVICES
-  if (path === '/api/services' && req.method === 'GET') return json(res, 200, db.services);
+  if (path === '/api/services' && req.method === 'GET') return ok(res, 200, db.services);
 
   // SETTINGS
-  if (path === '/api/settings' && req.method === 'GET') return json(res, 200, db.settings);
+  if (path === '/api/settings' && req.method === 'GET') return ok(res, 200, db.settings);
   if (path === '/api/settings' && req.method === 'PUT') {
+    if (!adminMutation(req, res)) return;
     const b = await readBody(req);
     db.settings = { ...db.settings, ...b };
     await saveDb(db);
-    return json(res, 200, db.settings);
+    return ok(res, 200, db.settings);
   }
 
   // SUMMARY
@@ -185,16 +210,8 @@ export default async function handler(req, res) {
       { id: 'checkout', label: 'صفحة الحجز', visitors: db.leads.length, pct: db.leads.length ? Math.round((db.leads.length / (db.leads.length + 40)) * 100) : 0 },
       { id: 'confirmed', label: 'تأكيد الحجز', visitors: db.bookings.length, pct: conv },
     ];
-    return json(res, 200, {
-      bookingsCount: db.bookings.length,
-      confirmed,
-      leadsCount: db.leads.length,
-      totalValue,
-      hasServices,
-      conv,
-      funnel,
-    });
+    return ok(res, 200, { bookingsCount: db.bookings.length, confirmed, leadsCount: db.leads.length, totalValue, hasServices, conv, funnel });
   }
 
-  json(res, 404, { error: 'not found' });
+  ok(res, 404, { error: 'not found' });
 }

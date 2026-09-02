@@ -1,6 +1,7 @@
 {
   "rewrites": [
     { "source": "/api/(.*)", "destination": "/api/api.js" },
+    { "source": "/uploads/:name", "destination": "/api/uploads_file?n=:name" },
     { "source": "/(.*)", "destination": "/index.html" }
   ]
 }

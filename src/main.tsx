@@ -1,6 +1,7 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
-import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Outlet, Navigate } from 'react-router-dom';
+import { isAdminAuthed } from './api';
 import './styles/global.css';
 import './styles/funnel.css';
 import './styles/checkout.css';
@@ -20,7 +21,12 @@ import Orders from './pages/admin/Orders';
 import Leads from './pages/admin/Leads';
 import Products from './pages/admin/Products';
 import Settings from './pages/admin/Settings';
+import Login from './pages/admin/Login';
 import { ChatWidget } from './components/ChatWidget';
+
+function RequireAuth() {
+  return isAdminAuthed() ? <Outlet /> : <Navigate to="/admin/login" replace />;
+}
 
 ReactDOM.createRoot(document.getElementById('app')!).render(
   <React.StrictMode>
@@ -33,13 +39,16 @@ ReactDOM.createRoot(document.getElementById('app')!).render(
         <Route path="/downsell" element={<Downsell />} />
         <Route path="/thankyou" element={<ThankYou />} />
 
-        <Route path="/admin" element={<AdminLayout />}>
-          <Route index element={<Overview />} />
-          <Route path="builder" element={<FunnelBuilder />} />
-          <Route path="orders" element={<Orders />} />
-          <Route path="leads" element={<Leads />} />
-          <Route path="products" element={<Products />} />
-          <Route path="settings" element={<Settings />} />
+        <Route path="/admin/login" element={<Login />} />
+        <Route element={<RequireAuth />}>
+          <Route path="/admin" element={<AdminLayout />}>
+            <Route index element={<Overview />} />
+            <Route path="builder" element={<FunnelBuilder />} />
+            <Route path="orders" element={<Orders />} />
+            <Route path="leads" element={<Leads />} />
+            <Route path="products" element={<Products />} />
+            <Route path="settings" element={<Settings />} />
+          </Route>
         </Route>
       </Routes>
     </BrowserRouter>

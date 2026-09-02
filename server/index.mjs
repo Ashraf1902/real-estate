@@ -11,6 +11,7 @@ const DATA_FILE = join(__dirname, 'data.json');
 const UPLOADS_DIR = join(__dirname, '..', 'public', 'uploads');
 if (!existsSync(UPLOADS_DIR)) mkdirSync(UPLOADS_DIR, { recursive: true });
 const PORT = process.env.PORT || 4000;
+const ADMIN_PASS = process.env.ADMIN_PASS || 'devpass123';
 
 const seed = {
   seq: { booking: 0, lead: 0 },
@@ -53,7 +54,7 @@ function nowStr() {
 const CORS = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Methods': 'GET,POST,PUT,DELETE,OPTIONS',
-  'Access-Control-Allow-Headers': 'Content-Type',
+  'Access-Control-Allow-Headers': 'Content-Type, X-Admin-Pass',
 };
 
 function readBody(req) {
@@ -111,6 +112,11 @@ function handleUpload(req, res) {
   req.pipe(busboy);
 }
 
+function isAdmin(req) {
+  if (!ADMIN_PASS) return false;
+  return (req.headers['x-admin-pass'] || req.headers['X-Admin-Pass'] || '') === ADMIN_PASS;
+}
+
 const server = http.createServer(async (req, res) => {
   if (req.method === 'OPTIONS') {
     res.writeHead(204, CORS);
@@ -126,8 +132,20 @@ const server = http.createServer(async (req, res) => {
   // HEALTH
   if (path === '/api/health' && req.method === 'GET') return send(200, { ok: true });
 
+  // AUTH
+  if (path === '/api/auth' && req.method === 'POST') {
+    const b = await readBody(req);
+    if (ADMIN_PASS && b && b.password && b.password === ADMIN_PASS) {
+      return send(200, { ok: true });
+    }
+    return send(401, { ok: false });
+  }
+
   // ---- UPLOAD (image -> webp) ----
-  if (path === '/api/upload' && req.method === 'POST') return handleUpload(req, res);
+  if (path === '/api/upload' && req.method === 'POST') {
+    if (!isAdmin(req)) return send(401, { error: 'unauthorized' });
+    return handleUpload(req, res);
+  }
 
   // ---- BOOKINGS ----
   if (path === '/api/bookings' && req.method === 'GET') return send(200, db.bookings);
@@ -150,6 +168,7 @@ const server = http.createServer(async (req, res) => {
     return send(201, row);
   }
   if (path.startsWith('/api/bookings/') && req.method === 'DELETE') {
+    if (!isAdmin(req)) return send(401, { error: 'unauthorized' });
     const id = decodeURIComponent(path.split('/').pop());
     const before = db.bookings.length;
     db.bookings = db.bookings.filter((x) => x.id !== id);
@@ -181,6 +200,7 @@ const server = http.createServer(async (req, res) => {
   // ---- PROPERTIES ----
   if (path === '/api/properties' && req.method === 'GET') return send(200, db.properties);
   if (path === '/api/properties' && req.method === 'POST') {
+    if (!isAdmin(req)) return send(401, { error: 'unauthorized' });
     const b = await readBody(req);
     const id = b.id || `P-${Date.now().toString().slice(-5)}`;
     const row = { ...b, id };
@@ -189,6 +209,7 @@ const server = http.createServer(async (req, res) => {
     return send(201, row);
   }
   if (path.startsWith('/api/properties/') && req.method === 'PUT') {
+    if (!isAdmin(req)) return send(401, { error: 'unauthorized' });
     const id = decodeURIComponent(path.split('/').pop());
     const idx = db.properties.findIndex((p) => p.id === id);
     if (idx === -1) return send(404, { error: 'not found' });
@@ -198,6 +219,7 @@ const server = http.createServer(async (req, res) => {
     return send(200, db.properties[idx]);
   }
   if (path.startsWith('/api/properties/') && req.method === 'DELETE') {
+    if (!isAdmin(req)) return send(401, { error: 'unauthorized' });
     const id = decodeURIComponent(path.split('/').pop());
     const before = db.properties.length;
     db.properties = db.properties.filter((p) => p.id !== id);
@@ -212,6 +234,7 @@ const server = http.createServer(async (req, res) => {
   // ---- SETTINGS ----
   if (path === '/api/settings' && req.method === 'GET') return send(200, db.settings);
   if (path === '/api/settings' && req.method === 'PUT') {
+    if (!isAdmin(req)) return send(401, { error: 'unauthorized' });
     const b = await readBody(req);
     db.settings = { ...db.settings, ...b };
     save();

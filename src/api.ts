@@ -1,6 +1,41 @@
 import type { BookingRow, PropertyLead, Property } from './data/mock';
 
 const BASE = '/api';
+const ADMIN_KEY = 'admin_pass';
+
+export function getAdminPass(): string {
+  try { return sessionStorage.getItem(ADMIN_KEY) || ''; } catch { return ''; }
+}
+export function setAdminPass(p: string): void {
+  try { if (p) sessionStorage.setItem(ADMIN_KEY, p); else sessionStorage.removeItem(ADMIN_KEY); } catch { /* ignore */ }
+}
+export function isAdminAuthed(): boolean {
+  return !!getAdminPass();
+}
+
+async function authedFetch(url: string, opts: RequestInit = {}): Promise<Response> {
+  const pass = getAdminPass();
+  const headers: Record<string, string> = { ...(opts.headers as Record<string, string> || {}) };
+  if (!headers['Content-Type']) headers['Content-Type'] = 'application/json';
+  if (pass) headers['X-Admin-Pass'] = pass;
+  return fetch(url, { ...opts, headers });
+}
+
+export async function adminLogin(password: string): Promise<boolean> {
+  try {
+    const r = await fetch(`${BASE}/auth`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ password }),
+    });
+    const j = await r.json();
+    if (j && j.ok) { setAdminPass(password); return true; }
+    return false;
+  } catch {
+    return false;
+  }
+}
+export async function adminLogout(): Promise<void> { setAdminPass(''); }
 
 export interface NewBooking {
   customer: string;
@@ -92,7 +127,10 @@ export async function uploadImage(file: File): Promise<string | null> {
   try {
     const fd = new FormData();
     fd.append('file', file);
-    const r = await fetch(`${BASE}/upload`, { method: 'POST', body: fd });
+    const headers: Record<string, string> = {};
+    const pass = getAdminPass();
+    if (pass) headers['X-Admin-Pass'] = pass;
+    const r = await fetch(`${BASE}/upload`, { method: 'POST', body: fd, headers });
     if (!r.ok) throw new Error('bad');
     const j = await r.json();
     return j.url ?? null;
@@ -103,9 +141,8 @@ export async function uploadImage(file: File): Promise<string | null> {
 
 export async function createProperty(p: Partial<Property>): Promise<Property | null> {
   try {
-    const r = await fetch(`${BASE}/properties`, {
+    const r = await authedFetch(`${BASE}/properties`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(p),
     });
     if (!r.ok) throw new Error('bad');
@@ -117,9 +154,8 @@ export async function createProperty(p: Partial<Property>): Promise<Property | n
 
 export async function updateProperty(id: string, p: Partial<Property>): Promise<Property | null> {
   try {
-    const r = await fetch(`${BASE}/properties/${encodeURIComponent(id)}`, {
+    const r = await authedFetch(`${BASE}/properties/${encodeURIComponent(id)}`, {
       method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(p),
     });
     if (!r.ok) throw new Error('bad');
@@ -131,7 +167,7 @@ export async function updateProperty(id: string, p: Partial<Property>): Promise<
 
 export async function deleteProperty(id: string): Promise<boolean> {
   try {
-    const r = await fetch(`${BASE}/properties/${encodeURIComponent(id)}`, { method: 'DELETE' });
+    const r = await authedFetch(`${BASE}/properties/${encodeURIComponent(id)}`, { method: 'DELETE' });
     return r.ok;
   } catch {
     return false;
@@ -174,9 +210,8 @@ export async function fetchSettings(fallback: AppSettings): Promise<AppSettings>
 
 export async function updateSettings(s: Partial<AppSettings>): Promise<AppSettings | null> {
   try {
-    const r = await fetch(`${BASE}/settings`, {
+    const r = await authedFetch(`${BASE}/settings`, {
       method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(s),
     });
     if (!r.ok) throw new Error('bad');
