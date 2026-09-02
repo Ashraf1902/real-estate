@@ -1,15 +1,17 @@
 import { useState } from 'react';
-import { GripVertical, GitBranch, Copy, Check, Save, Plus, ArrowLeft, ArrowUpRight, Trophy } from 'lucide-react';
+import { GripVertical, GitBranch, Copy, Check, Save, Plus, ArrowLeft, ArrowUpRight, Trophy, Eye } from 'lucide-react';
 import { abcampaigns } from '../../data/mock';
 import { useToast } from './AdminLayout';
+import { fetchSettings, updateSettings } from '../../api';
 
 function Toggle({ on, set }: { on: boolean; set: (v: boolean) => void }) {
   return <button type="button" className={`toggle ${on ? 'on' : ''}`} onClick={() => set(!on)} aria-pressed={on} />;
 }
 
-function Block({ id, mutable, cta, delta, onChange }: {
+function Block({ id, mutable, cta, delta, onChange, onPreview }: {
   id: string; mutable: string; cta: string; delta: number;
   onChange: (id: string, field: 'mutable' | 'cta', v: string) => void;
+  onPreview: (id: string) => void;
 }) {
   return (
     <div className="block">
@@ -21,7 +23,7 @@ function Block({ id, mutable, cta, delta, onChange }: {
       <div className="bl-top" style={{ marginTop: '.5rem', marginBottom: '.4rem' }}><GripVertical size={18} className="grip" /><b>نص زر الـ CTA</b></div>
       <div className="bl-inputs">
         <input value={cta} onChange={(e) => onChange(id, 'cta', e.target.value)} aria-label="الـ CTA" />
-        <button className="bl-cta" onClick={(e) => { e.preventDefault(); }}>عاين</button>
+        <button className="bl-cta" onClick={(e) => { e.preventDefault(); onPreview(id); }}><Eye size={13} /> عاين</button>
       </div>
     </div>
   );
@@ -38,11 +40,38 @@ export default function FunnelBuilder() {
   const [abTraffic, setAbTraffic] = useState(50);
   const [pixelOn, setPixelOn] = useState(true);
   const [done, setDone] = useState(false);
+  const [previewBlock, setPreviewBlock] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
 
   const changeBlock = (id: string, field: 'mutable' | 'cta', v: string) =>
     setBlocks((bs) => bs.map((b) => (b.id === id ? { ...b, [field]: v } : b)));
 
-  const save = () => { toast('تم حفظ النسخة ونشرها بنجاح'); };
+  const load = async () => {
+    const s = await fetchSettings().catch(() => null);
+    if (s && Array.isArray(s.landingBlocks) && s.landingBlocks.length === blocks.length) {
+      setBlocks(s.landingBlocks);
+      if (typeof s.abTraffic === 'number') setAbTraffic(s.abTraffic);
+      if (s.distributeVisitors === true || s.distributeVisitors === false) setPixelOn(s.distributeVisitors);
+    }
+  };
+  load();
+
+  const save = async () => {
+    setSaving(true);
+    const s = await updateSettings({ landingBlocks: blocks, abTraffic, distributeVisitors: pixelOn, activeAbVersion: aSel });
+    setSaving(false);
+    toast(s ? 'تم حفظ النسخة ونشرها بنجاح' : 'تعذر الحفظ — تأكد من تشغيل الخادم');
+  };
+
+  const addVersion = () => {
+    setDone((d) => { if (!d) toast('أضيفت نسخة جديدة من صفحة الهبوط — عدّل النصوص ثم احفظ'); else toast('تمت إزالة النسخة الإضافية'); return !d; });
+  };
+
+  const previewOf = (id: string) => {
+    const b = blocks.find((x) => x.id === id);
+    setPreviewBlock(previewBlock === id ? null : id);
+    if (b) toast(`معاينة: «${b.cta}»`);
+  };
 
   const win = abcampaigns.find((c) => c.winner)?.id === 'B';
   const a = abcampaigns.find((c) => c.id === 'A')!;
@@ -54,11 +83,23 @@ export default function FunnelBuilder() {
         <span style={{ fontWeight: 800, fontFamily: 'var(--f-display)' }}>صفحة الهبوط الرئيسية</span>
         <span className="pill on"><Check size={13} /> منشورة</span>
         <span style={{ marginInlineStart: 'auto' }} />
-        <button className="btn-ghost" onClick={() => { setDone((d) => { if (!d) toast('أضيفت نسخة جديدة من الصفحة'); return !d; }); }}>
+        <button className="btn-ghost" onClick={addVersion}>
           {done ? <><Copy size={15} /> نسخة إضافية</> : <><Plus size={15} /> إضافة نسخة جديدة</>}
         </button>
-        <button className="btn-solid" onClick={save}><Save size={15} /> حفظ ونشر النسخة</button>
+        <button className="btn-solid" onClick={save} disabled={saving}>
+          {saving ? <><Save size={15} /> جارٍ…</> : <><Save size={15} /> حفظ ونشر النسخة</>}
+        </button>
       </div>
+
+      {previewBlock && (() => { const pb = blocks.find((x) => x.id === previewBlock); return pb ? (
+        <div className="panel" style={{ marginBottom: '1.4rem', border: '1.5px solid var(--emerald)' }}>
+          <div className="panel-head"><h3><Eye size={18} /> معاينة العنصر</h3><span className="meta">كيف سيظهر CTA للزائر</span></div>
+          <div className="panel-body" style={{ textAlign: 'center' }}>
+            <p style={{ fontSize: '1.05rem', fontWeight: 800, marginBottom: '1rem' }}>{pb.mutable}</p>
+            <button className="pbook" style={{ margin: '0 auto' }}>{pb.cta} ←</button>
+          </div>
+        </div>
+      ) : null; })()}
 
       {/* A/B test panel */}
       <div className="panel" style={{ marginBottom: '1.4rem' }}>
@@ -95,7 +136,7 @@ export default function FunnelBuilder() {
       <div className="panel" style={{ marginBottom: '1.4rem' }}>
         <div className="panel-head"><h3><GripVertical size={18} /> محرر عناصر الصفحة</h3><span className="meta">جرّب تغيير النص وجاوب على أداء النسخة</span></div>
         <div className="panel-body">
-          {blocks.map((b) => <Block key={b.id} {...b} id={b.id} onChange={changeBlock} />)}
+          {blocks.map((b) => <Block key={b.id} {...b} id={b.id} onChange={changeBlock} onPreview={previewOf} />)}
         </div>
       </div>
 

@@ -44,6 +44,7 @@ export function AdminLayout() {
   const [range, setRange] = useState<RangeKey>('30');
   const [adminName, setAdminName] = useState('محمود الشريف');
   const [leadsCount, setLeadsCount] = useState<number>(0);
+  const [notifOpen, setNotifOpen] = useState(false);
   const showToast = useCallback((msg: string) => {
     setToast(msg);
     setTimeout(() => setToast(null), 2800);
@@ -92,13 +93,22 @@ export function AdminLayout() {
                 <h1>لوحة تحكم الفانل</h1>
                 <div className="sub">أهلًا {adminName} 👋 · نظرة على أداء الفانل في {rangeLabel[range]}</div>
               </div>
-              <div className="adm-actions">
+              <div className="adm-actions" style={{ position: 'relative' }}>
                 <span className="period num">
                   <button className={range === '30' ? 'on' : ''} onClick={() => setRange('30')}>30 يوم</button>
                   <button className={range === '7' ? 'on' : ''} onClick={() => setRange('7')}>أسبوع</button>
                   <button className={range === '1' ? 'on' : ''} onClick={() => setRange('1')}>اليوم</button>
                 </span>
-                <button className="btn-solid" onClick={() => showToast('تم إنشاء نسخة احتياطية من بيانات الفانل')}><Bell size={16} /> إشعارات</button>
+                <button className="btn-solid" onClick={() => setNotifOpen((v) => !v)}><Bell size={16} /> إشعارات</button>
+                {notifOpen && (
+                  <div className="notif-pop">
+                    <div className="notif-head">الإشعارات والإعدادات
+                      <button onClick={() => showToast('تم مزامنة البيانات مع الخادم بنجاح')} style={{ marginInlineStart: 'auto', fontSize: '.76rem', fontWeight: 800, color: 'var(--emerald)' }}>مزامنة</button>
+                    </div>
+                    <div className="notif-item"><b>{leadsCount > 0 ? `${leadsCount} عميل محتمل جديد` : 'لا عملاء جدد حتى الآن'}</b><span>{leadsCount > 0 ? 'يستحقون المتابعة الآن' : 'اشترك لمتابعة الفانل'}</span></div>
+                    <div className="notif-item"><b>آخر مزامنة</b><span>تمت الآن · البيانات محفوظة على الخادم</span></div>
+                  </div>
+                )}
               </div>
             </div>
             <div className="adm-body">

@@ -19,7 +19,25 @@ const seed = {
   leads: [],
   properties: JSON.parse(JSON.stringify(seedProperties)),
   services: JSON.parse(JSON.stringify(seedServices)),
-  settings: { adminName: 'محمود الشريف', brand: 'Real Estate' },
+  settings: {
+    adminName: 'محمود الشريف',
+    brand: 'Real Estate',
+    maintenance: false,
+    rtl: true,
+    forceSecure: true,
+    emailNotify: true,
+    maintenanceMessage: 'نعود قريبًا بعد تطوير الفانل',
+    gates: [
+      { name: 'فودافون كاش', on: true },
+      { name: 'الدفع بالبطاقة (Visa/Master)', on: true },
+      { name: 'التحويل البنكي', on: false },
+      { name: 'محفظة موبي/أورانج', on: false },
+    ],
+    pixels: { meta: true, gtm: false, tiktok: false },
+    coupons: [],
+    orderBumpOn: true,
+    upsellOn: true,
+  },
 };
 
 function load() {
@@ -32,7 +50,7 @@ function load() {
     // ensure new collections exist for older files
     d.properties = d.properties ?? JSON.parse(JSON.stringify(seedProperties));
     d.services = d.services ?? JSON.parse(JSON.stringify(seedServices));
-    d.settings = d.settings ?? { adminName: 'محمود الشريف', brand: 'Real Estate' };
+    d.settings = Object.assign({}, JSON.parse(JSON.stringify(seed.settings)), d.settings || {});
     return d;
   } catch {
     return JSON.parse(JSON.stringify(seed));

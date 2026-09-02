@@ -2,7 +2,7 @@ import { Link } from 'react-router-dom';
 import { useLocation } from 'react-router-dom';
 import { useEffect, useState, useRef } from 'react';
 import { Check, Mail, Send, MessagesSquare, KeyRound, Download, FileText, Bell, MapPin } from 'lucide-react';
-import { properties } from '../../data/mock';
+import { properties, agency } from '../../data/mock';
 import { getDraft, clearDraft } from '../../funnelState';
 import { createBooking, createLead, fetchPropertyById } from '../../api';
 
@@ -86,8 +86,8 @@ export default function ThankYou() {
               — <b style={{ color: 'var(--emerald)' }}>من غير أي دفع.</b> المقدم والتقسيط هيتفقوا معاك مع فريق المبيعات عند التواصل.
             </div>
             <div className="ty-groups">
-              <a href="#" className="ty-group tg1"><Send size={20} /> تواصل واتساب مع فريق المبيعات</a>
-              <a href="#" className="ty-group tg2"><MessagesSquare size={20} /> انضم لمجموعة ملاك الوحدات</a>
+              <a href={`https://wa.me/${(agency.phone || '').replace(/\D/g, '')}?text=${encodeURIComponent(`مرحبًا، حجزت وحدة ${st.propertyId ? prop.title : ''} — أود متابعة الخطوات`)}`} target="_blank" rel="noreferrer" className="ty-group tg1"><Send size={20} /> تواصل واتساب مع فريق المبيعات</a>
+              <a href={`https://wa.me/${(agency.phone || '').replace(/\D/g, '')}?text=${encodeURIComponent('أود الانضمام لمجموعة ملاك الوحدات')}`} target="_blank" rel="noreferrer" className="ty-group tg2"><MessagesSquare size={20} /> انضم لمجموعة ملاك الوحدات</a>
             </div>
             <div className="ty-note">
               <Bell size={15} style={{ display: 'inline', verticalAlign: '-3px', color: 'var(--gold)' }} />{' '}

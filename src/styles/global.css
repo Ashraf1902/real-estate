@@ -55,3 +55,12 @@ input,select,textarea{font:inherit;color:inherit}
   html{scroll-behavior:auto}
   .reveal{opacity:1;transform:none}
 }
+
+/* ---------- Maintenance mode ---------- */
+.maint-screen{min-height:100vh;display:flex;align-items:center;justify-content:center;background:linear-gradient(160deg,#FFF9FA,#FBE9EC);padding:2rem}
+.maint-card{max-width:460px;width:100%;text-align:center;background:var(--card);border:1px solid var(--line);border-radius:24px;box-shadow:var(--shadow-pop);padding:3rem 2.4rem}
+.maint-ico{width:84px;height:84px;margin:0 auto 1.2rem;border-radius:22px;display:flex;align-items:center;justify-content:center;color:#fff;background:linear-gradient(135deg,var(--navy),var(--navy-2));box-shadow:0 12px 26px -10px rgba(200,16,46,.5)}
+.maint-card h1{font-family:var(--f-display);font-weight:900;color:var(--navy);margin-bottom:.6rem;font-size:1.6rem}
+.maint-card p{font-size:1rem;color:var(--ink-soft);font-weight:600;margin-bottom:1.2rem}
+.maint-note{font-size:.82rem;color:var(--navy-2);font-weight:700;display:flex;align-items:center;justify-content:center;gap:.4rem;padding-top:.9rem;border-top:1px dashed var(--line)}
+

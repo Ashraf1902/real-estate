@@ -13,7 +13,25 @@ const seed = {
   leads: [],
   properties: JSON.parse(JSON.stringify(seedProperties)),
   services: JSON.parse(JSON.stringify(seedServices)),
-  settings: { adminName: 'محمود الشريف', brand: 'Real Estate' },
+  settings: {
+    adminName: 'محمود الشريف',
+    brand: 'Real Estate',
+    maintenance: false,
+    rtl: true,
+    forceSecure: true,
+    emailNotify: true,
+    maintenanceMessage: 'نعود قريبًا بعد تطوير الفانل',
+    gates: [
+      { name: 'فودافون كاش', on: true },
+      { name: 'الدفع بالبطاقة (Visa/Master)', on: true },
+      { name: 'التحويل البنكي', on: false },
+      { name: 'محفظة موبي/أورانج', on: false },
+    ],
+    pixels: { meta: true, gtm: false, tiktok: false },
+    coupons: [],
+    orderBumpOn: true,
+    upsellOn: true,
+  },
 };
 
 const ADMIN_PASS = process.env.ADMIN_PASS || '';

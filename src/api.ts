@@ -193,18 +193,73 @@ export async function fetchServices(fallback: ServiceItem[]): Promise<ServiceIte
   }
 }
 
+export interface PaymentGate {
+  name: string;
+  on: boolean;
+}
+
+export interface PixelsSettings {
+  meta: boolean;
+  gtm: boolean;
+  tiktok: boolean;
+}
+
+export interface CouponItem {
+  code: string;
+  discount: string;
+  type: string;
+  valid: string;
+  uses: number;
+  on: boolean;
+}
+
 export interface AppSettings {
   adminName: string;
   brand: string;
+  maintenance: boolean;
+  maintenanceMessage: string;
+  rtl: boolean;
+  forceSecure: boolean;
+  emailNotify: boolean;
+  gates: PaymentGate[];
+  pixels: PixelsSettings;
+  coupons: CouponItem[];
+  orderBumpOn: boolean;
+  upsellOn: boolean;
+  landingBlocks?: { id: string; mutable: string; cta: string; delta: number }[];
+  abTraffic?: number;
+  distributeVisitors?: boolean;
+  activeAbVersion?: string;
 }
 
-export async function fetchSettings(fallback: AppSettings): Promise<AppSettings> {
+export const defaultSettings: AppSettings = {
+  adminName: 'محمود الشريف',
+  brand: 'Real Estate',
+  maintenance: false,
+  maintenanceMessage: 'نعود قريبًا بعد تطوير الفانل',
+  rtl: true,
+  forceSecure: true,
+  emailNotify: true,
+  gates: [
+    { name: 'فودافون كاش', on: true },
+    { name: 'الدفع بالبطاقة (Visa/Master)', on: true },
+    { name: 'التحويل البنكي', on: false },
+    { name: 'محفظة موبي/أورانج', on: false },
+  ],
+  pixels: { meta: true, gtm: false, tiktok: false },
+  coupons: [],
+  orderBumpOn: true,
+  upsellOn: true,
+};
+
+export async function fetchSettings(fallback?: Partial<AppSettings>): Promise<AppSettings> {
   try {
     const r = await fetch(`${BASE}/settings`);
     if (!r.ok) throw new Error('bad');
-    return (await r.json()) as AppSettings;
+    const s = (await r.json()) as Partial<AppSettings>;
+    return { ...defaultSettings, ...s, gates: [...defaultSettings.gates, ...(s.gates || [])], pixels: { ...defaultSettings.pixels, ...(s.pixels || {}) } };
   } catch {
-    return fallback;
+    return { ...defaultSettings, ...fallback } as AppSettings;
   }
 }
 

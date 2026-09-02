@@ -148,7 +148,7 @@ export function normalize(db, seed) {
   db.services = db.services ?? JSON.parse(JSON.stringify(seed.services));
   db.bookings = db.bookings ?? [];
   db.leads = db.leads ?? [];
-  db.settings = db.settings ?? { adminName: 'محمود الشريف', brand: 'Real Estate' };
+  db.settings = Object.assign({}, JSON.parse(JSON.stringify(seed.settings)), db.settings || {});
   db.seq = db.seq ?? { booking: 0, lead: 0 };
   return db;
 }

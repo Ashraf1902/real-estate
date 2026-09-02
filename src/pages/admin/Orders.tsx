@@ -16,6 +16,9 @@ export default function Orders() {
   const toast = useToast();
   const [q, setQ] = useState('');
   const [status, setStatus] = useState('الكل');
+  const [showFilters, setShowFilters] = useState(false);
+  const [onlyServices, setOnlyServices] = useState(false);
+  const [withDown, setWithDown] = useState(false);
   const [rows, setRows] = useState<BookingRow[]>(bookings);
   const statuses = ['الكل', 'مؤكد', 'قيد المراجعة', 'تم التسليم', 'ملغي'];
 
@@ -25,10 +28,14 @@ export default function Orders() {
     return () => { alive = false; };
   }, []);
 
+  const resetFilters = () => { setOnlyServices(false); setWithDown(false); setStatus('الكل'); toast('تم تصفير الفلاتر'); };
+
   const filtered = rows.filter((o) => {
     const matchStatus = status === 'الكل' || o.status === status;
     const matchQ = o.customer.toLowerCase().includes(q.toLowerCase()) || o.id.toLowerCase().includes(q.toLowerCase()) || o.property.includes(q);
-    return matchStatus && matchQ;
+    const matchServices = !onlyServices || o.servi;
+    const matchDown = !withDown || o.downPayment > 0;
+    return matchStatus && matchQ && matchServices && matchDown;
   });
 
   const exportCSV = () => {
@@ -51,11 +58,26 @@ export default function Orders() {
           <Search size={16} color="var(--ink-soft)" />
           <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="ابحث بالعميل أو الوحدة أو رقم الحجز…" style={{ border: 'none', outline: 'none', background: 'transparent', fontSize: '.88rem', width: 240 }} />
         </div>
-        <button className="btn-ghost"><SlidersHorizontal size={15} /> فلترة</button>
+        <button className={`btn-ghost ${showFilters ? 'on' : ''}`} onClick={() => setShowFilters((v) => !v)}><SlidersHorizontal size={15} /> فلترة</button>
         <span style={{ marginInlineStart: 'auto' }} />
         <button className="btn-ghost" onClick={exportCSV}><FileText size={15} /> CSV</button>
         <button className="btn-solid" onClick={exportCSV}><Download size={15} /> تصدير Excel</button>
       </div>
+
+      {showFilters && (
+        <div className="panel" style={{ marginBottom: '1rem' }}>
+          <div className="panel-head"><h3><SlidersHorizontal size={18} /> فلترة متقدمة</h3>
+            <button className="btn-ghost" style={{ padding: '.3rem .6rem', fontSize: '.78rem' }} onClick={resetFilters}>تصفير</button></div>
+          <div className="panel-body" style={{ display: 'flex', gap: '1.4rem', flexWrap: 'wrap', alignItems: 'center' }}>
+            <label style={{ display: 'flex', alignItems: 'center', gap: '.4rem', fontSize: '.86rem', fontWeight: 700 }}>
+              <input type="checkbox" checked={onlyServices} onChange={(e) => setOnlyServices(e.target.checked)} /> حجوزات بطلبات خدمات فقط
+            </label>
+            <label style={{ display: 'flex', alignItems: 'center', gap: '.4rem', fontSize: '.86rem', fontWeight: 700 }}>
+              <input type="checkbox" checked={withDown} onChange={(e) => setWithDown(e.target.checked)} /> بمقدم مدفوع فقط
+            </label>
+          </div>
+        </div>
+      )}
 
       <div className="tabs num">
         {statuses.map((s) => (

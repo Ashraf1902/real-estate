@@ -202,3 +202,12 @@ table.tbl{width:100%;border-collapse:collapse;min-width:560px}
   .period{flex-wrap:wrap}
 }
 
+/* Notifications dropdown */
+.notif-pop{position:absolute;top:calc(100% + 8px);right:0;width:300px;background:#fff;border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow-pop);padding:.6rem;z-index:50}
+.notif-head{display:flex;align-items:center;gap:.4rem;font-weight:800;font-size:.88rem;padding:.4rem .6rem .7rem;border-bottom:1px solid var(--line-soft);margin-bottom:.3rem}
+.notif-item{padding:.55rem .6rem;border-radius:9px}
+.notif-item:hover{background:var(--line-soft)}
+.notif-item b{display:block;font-size:.84rem}
+.notif-item span{font-size:.74rem;color:var(--ink-soft)}
+
+

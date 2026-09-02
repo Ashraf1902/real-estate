@@ -38,6 +38,22 @@ export default function Leads() {
 
   const abandonedValue = rows.reduce((s, l) => s + l.value, 0);
 
+  const contactLead = (l: PropertyLead) => {
+    const digits = l.phone.replace(/\D/g, '');
+    const msg = encodeURIComponent(`مرحبًا ${l.name}، من فريق Real Estate. تم استلام طلبك ونود متابعة تفاصيل استلام وحدتك 😊`);
+    if (!digits) { toast(`لا يوجد رقم هاتف صحيح للتواصل مع ${l.name}`); return; }
+    window.open(`https://wa.me/${digits}?text=${msg}`, '_blank');
+    toast(`فتحنا محادثة واتساب مع ${l.name}`);
+  };
+
+  const bulkFollowUp = () => {
+    if (!filtered.length) { toast('لا يوجد عملاء للمتابعة'); return; }
+    const withPhone = filtered.filter((l) => l.phone.replace(/\D/g, ''));
+    if (!withPhone.length) { toast('لا يوجد عملاء بأرقام صالحة'); return; }
+    withPhone.forEach((l) => window.open(`https://wa.me/${l.phone.replace(/\D/g, '')}`, '_blank'));
+    toast(`فتحنا ${withPhone.length} محادثة متابعة مع عملاء محتملين`);
+  };
+
   return (
     <div>
       <div className="grid3" style={{ marginBottom: '1.4rem' }}>
@@ -61,7 +77,7 @@ export default function Leads() {
         </div>
         <span style={{ marginInlineStart: 'auto' }} />
         <button className="btn-ghost" onClick={exportCSV}><Download size={15} /> تصدير CSV</button>
-        <button className="btn-solid" onClick={exportCSV}><Mail size={15} /> إرسال متابعة جماعية</button>
+        <button className="btn-solid" onClick={bulkFollowUp}><Mail size={15} /> إرسال متابعة جماعية</button>
       </div>
 
       <div className="panel">
@@ -81,7 +97,7 @@ export default function Leads() {
                   <td><span className={`badge ${statusMap[l.status]}`}>{l.status}</span></td>
                   <td className="num" style={{ fontSize: '.8rem', color: 'var(--ink-soft)' }}>{l.date}</td>
                   <td>
-                    <button className="btn-ghost" style={{ padding: '.35rem .7rem', fontSize: '.78rem' }} onClick={() => toast(`تم إرسال رسالة متابعة إلى ${l.name}`)}>
+                    <button className="btn-ghost" style={{ padding: '.35rem .7rem', fontSize: '.78rem' }} onClick={() => contactLead(l)}>
                       <Phone size={13} /> تواصل
                     </button>
                   </td>

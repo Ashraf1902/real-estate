@@ -2,8 +2,9 @@ import { useState, useEffect, useRef } from 'react';
 import { Plus, Package, Building2, Users, Save, Tag, CirclePlus, Trash2, PencilRuler, Armchair, Wrench, Pencil, X, ImagePlus, Loader2 } from 'lucide-react';
 import { addonServices, coupons } from '../../data/mock';
 import { useToast } from './AdminLayout';
-import { fetchProperties, createProperty, updateProperty, deleteProperty, uploadImage } from '../../api';
+import { fetchProperties, createProperty, updateProperty, deleteProperty, uploadImage, fetchSettings, updateSettings } from '../../api';
 import type { Property, PropertyType } from '../../data/mock';
+import type { CouponItem } from '../../api';
 
 function Toggle({ on, set }: { on: boolean; set: (v: boolean) => void }) {
   return <button type="button" className={`toggle ${on ? 'on' : ''}`} onClick={() => set(!on)} aria-pressed={on} />;
@@ -27,10 +28,20 @@ export default function Products() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
-  const [couponList, setCouponList] = useState(coupons.map((c) => ({ ...c, on: true })));
+  const [couponList, setCouponList] = useState<CouponItem[]>([]);
   const [newCoupon, setNewCoupon] = useState('');
   const [otoOn, setOtoOn] = useState(true);
   const [bumpOn, setBumpOn] = useState(true);
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    refresh();
+    fetchSettings().then((s) => {
+      setCouponList(Array.isArray(s.coupons) ? s.coupons : coupons.map((c) => ({ ...c, on: true })));
+      setBumpOn(s.orderBumpOn);
+      setOtoOn(s.upsellOn);
+    }).catch(() => {});
+  }, []);
 
   const handleFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -50,10 +61,6 @@ export default function Products() {
   const refresh = () => {
     fetchProperties([]).then((ps) => setProperties(ps)).catch(() => {});
   };
-
-  useEffect(() => {
-    refresh();
-  }, []);
 
   const resetForm = () => {
     setForm(emptyForm);
@@ -126,12 +133,27 @@ export default function Products() {
     if (!newCoupon.trim()) return;
     setCouponList((cs) => [{ code: newCoupon.toUpperCase(), discount: '10%', type: 'نسبة', valid: 'غير محدود', uses: 0, on: true }, ...cs]);
     setNewCoupon('');
-    toast(`تم إنشاء كود الخصم ${newCoupon.toUpperCase()}`);
+    toast(`تم إنشاء كود الخصم ${newCoupon.toUpperCase()} — اضغط «حفظ كل الإعدادات» لتطبيقه`);
   };
 
   const removeCoupon = (code: string) => {
     setCouponList((cs) => cs.filter((c) => c.code !== code));
-    toast(`تم حذف الكود ${code}`);
+    toast(`تم حذف الكود ${code} — اضغط «حفظ كل الإعدادات» لتطبيقه`);
+  };
+
+  const saveAllSettings = async () => {
+    setSaving(true);
+    const s = await updateSettings({ coupons: couponList, orderBumpOn: bumpOn, upsellOn: otoOn });
+    setSaving(false);
+    if (s) {
+      toast('تم حفظ خيارات الوحدات والخدمات والكوبونات والعروض');
+    } else {
+      toast('تعذر الحفظ — تأكد من تشغيل الخادم');
+    }
+  };
+
+  const scrollToForm = () => {
+    document.getElementById('prop-form')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   };
 
   return (
@@ -144,12 +166,12 @@ export default function Products() {
             {editingId ? (
               <button className="btn-ghost" style={{ padding: '.4rem .7rem', fontSize: '.8rem' }} onClick={resetForm}><X size={14} /> إلغاء التعديل</button>
             ) : (
-              <button className="btn-ghost" style={{ padding: '.4rem .7rem', fontSize: '.8rem' }} onClick={() => toast('املأ النموذج بالأسفل لإضافة عقار')}><Plus size={14} /> إضافة وحدة</button>
+              <button className="btn-ghost" style={{ padding: '.4rem .7rem', fontSize: '.8rem' }} onClick={scrollToForm}><Plus size={14} /> إضافة وحدة</button>
             )}
           </div>
 
           {/* Add / Edit form */}
-          <div className="panel-body" style={{ borderBottom: '1px solid var(--line)', marginBottom: '.5rem' }}>
+          <div className="panel-body" style={{ borderBottom: '1px solid var(--line)', marginBottom: '.5rem' }} id="prop-form">
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '.5rem', marginBottom: '.5rem' }}>
               <input value={form.title} onChange={set('title')} placeholder="عنوان العقار (مثال: شقة 3 غرف)" style={inp} />
               <select value={form.type} onChange={set('type')} style={inp}>
@@ -267,7 +289,9 @@ export default function Products() {
       </div>
 
       <div style={{ marginTop: '1.4rem' }}>
-        <button className="btn-solid" onClick={() => toast('تم حفظ إعدادات الوحدات والخدمات والعروض')}><Save size={16} /> حفظ كل الإعدادات</button>
+        <button className="btn-solid" onClick={saveAllSettings} disabled={saving}>
+          {saving ? <Loader2 size={16} className="spin" /> : <Save size={16} />} {saving ? 'جارٍ الحفظ…' : 'حفظ كل الإعدادات'}
+        </button>
       </div>
     </div>
   );

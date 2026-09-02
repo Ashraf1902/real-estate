@@ -23,6 +23,7 @@ import Products from './pages/admin/Products';
 import Settings from './pages/admin/Settings';
 import Login from './pages/admin/Login';
 import { ChatWidget } from './components/ChatWidget';
+import MaintenanceGate from './components/MaintenanceGate';
 
 function RequireAuth() {
   return isAdminAuthed() ? <Outlet /> : <Navigate to="/admin/login" replace />;
@@ -33,11 +34,11 @@ ReactDOM.createRoot(document.getElementById('app')!).render(
     <BrowserRouter>
       <ChatWidget />
       <Routes>
-        <Route path="/" element={<Landing />} />
-        <Route path="/checkout" element={<Checkout />} />
-        <Route path="/upsell" element={<Upsell />} />
-        <Route path="/downsell" element={<Downsell />} />
-        <Route path="/thankyou" element={<ThankYou />} />
+        <Route path="/" element={<MaintenanceGate><Landing /></MaintenanceGate>} />
+        <Route path="/checkout" element={<MaintenanceGate><Checkout /></MaintenanceGate>} />
+        <Route path="/upsell" element={<MaintenanceGate><Upsell /></MaintenanceGate>} />
+        <Route path="/downsell" element={<MaintenanceGate><Downsell /></MaintenanceGate>} />
+        <Route path="/thankyou" element={<MaintenanceGate><ThankYou /></MaintenanceGate>} />
 
         <Route path="/admin/login" element={<Login />} />
         <Route element={<RequireAuth />}>
